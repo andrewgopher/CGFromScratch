@@ -1,8 +1,5 @@
 #include <iostream>
 #include "geometry.h"
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Geometry>
-using namespace Eigen;
 
 int main() {
     Line line({0.0, 0.0, 0.0}, {1.0, 0.0, 0.0});

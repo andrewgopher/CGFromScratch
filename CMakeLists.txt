@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.1.0)
 
 project(CGFromScratch)
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH  ${CMAKE_BINARY_DIR}/lib)
@@ -23,10 +23,18 @@ find_package(SDL2 REQUIRED)
 
 include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(src/)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
-add_library(geometry SHARED src/geometry.cpp)
+add_library(geometry STATIC src/geometry.cpp)
+add_library(open_obj STATIC src/open_obj.cpp)
+target_link_libraries(open_obj geometry)
+
 add_executable(cg_from_scratch src/main.cpp)
 add_executable(test_geometry src/test_geometry.cpp)
+add_executable(test_open_obj src/test_open_obj.cpp)
 target_link_libraries(cg_from_scratch geometry)
+target_link_libraries(cg_from_scratch open_obj)
 target_link_libraries(test_geometry geometry)
-target_link_libraries(cg_from_scratch ${SDL2_LIBRARIES})
+target_link_libraries(test_open_obj open_obj)
+target_link_libraries(cg_from_scratch ${SDL2_LIBRARIES} Threads::Threads)

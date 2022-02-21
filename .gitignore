@@ -5,10 +5,12 @@
 
 # IDE develop files
 *.vscode
+tags
+*.vim
 
 # Compiled files
 *.so
-*.out
+*.out*
 *.o
 bin/*
 lib/*
