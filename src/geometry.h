@@ -32,6 +32,7 @@ Vector3f operator*(float s, Vector3f v);
 Vector3f operator+(Vector3f v1, Vector3f v2);
 
 Vector3f operator*(Vector3f v, Matrix3f m);
+Matrix3f operator*(Matrix3f m1, Matrix3f m2);
 
 struct Triangle {
     Triangle() {};

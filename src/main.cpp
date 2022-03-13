@@ -35,8 +35,14 @@ float viewport_distance = 4;
 
 
 std::vector<TriangleObject> triangles;
-Matrix3f overall_transformation;
-float overall_y_angle = 0;
+Matrix3f y_rotation;
+float y_angle = 0;
+Matrix3f x_rotation;
+float x_angle = 0;
+Matrix3f z_rotation;
+float z_angle = 0;
+
+Matrix3f transformation;
 
 Uint8 random_0_255() {
     return rand() % 256;
@@ -52,7 +58,7 @@ void define_scene() {
     for (auto face : cube.faces) {
         triangles.push_back({face, random_color()});
     }
-    overall_transformation.set_x_rotation(overall_y_angle);
+    transformation.set_x_rotation(y_angle);
 }
 
 
@@ -74,7 +80,7 @@ Color trace_ray(Line line) {
     float closest_intersection_index = -1;
     int i = 0;
     for (auto triangle : triangles) {
-        float current_intersection = intersects(line, triangle.triangle.transform(overall_transformation));
+        float current_intersection = intersects(line, triangle.triangle.transform(transformation));
         if (current_intersection < closest_intersection && current_intersection > 1) {
             closest_intersection = current_intersection;
             closest_intersection_index = i;
@@ -170,11 +176,23 @@ int main() {
         
         SDL_RenderPresent(renderer);
 
-        overall_y_angle += 0.05;
-        if (overall_y_angle >= 360.0f) {
-            overall_y_angle -= 360.0f;
+        y_angle += 0.05;
+        if (y_angle >= 360.0f) {
+            y_angle -= 360.0f;
         }
-        overall_transformation.set_y_rotation(overall_y_angle);
+        x_angle += 0.05;
+        if (x_angle >= 360.0f) {
+            x_angle -= 360.0f;
+        }
+        z_angle += 0.05;
+        if (z_angle >= 360.0f) {
+            z_angle -= 360.0f;
+        }
+        y_rotation.set_y_rotation(y_angle);
+        x_rotation.set_x_rotation(x_angle);
+        z_rotation.set_z_rotation(z_angle);
+
+        transformation = x_rotation * y_rotation * z_rotation;
     }
     SDL_Quit();
     return 0;
