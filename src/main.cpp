@@ -60,7 +60,7 @@ Color screen[window_width][window_height];
 int camera_width = 16;
 int camera_height = 9;
 Vector3f camera_position = {0, 0, -5};
-float viewport_distance = 4.8;
+float viewport_distance = 4;
 //TODO: camera pointing direction
 
 
