@@ -9,9 +9,7 @@ int main() {
     }
     std::cout << "faces: \n";
     for (auto face : test_model.faces) {
-        std::cout << face.point1.x << " " << face.point1.y << " " << face.point1.z << " | "
-            << face.point2.x << " " << face.point2.y << " " << face.point2.z << " | "
-            << face.point3.x << " " << face.point3.y << " " << face.point3.z << "\n";
+        std::cout << face.to_string();
     }
     return 0;
 }

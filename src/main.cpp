@@ -4,7 +4,8 @@
 #include <chrono>
 #include <thread>
 #include <ctime>
-#include <stdlib.h>
+#include <cstdlib>
+#include <array>
 #include "geometry.h"
 #include "open_obj.h"
 
@@ -17,8 +18,37 @@ struct Color {
 
 struct TriangleObject {
     Triangle triangle;
+    std::array<Vector3f, 3> normals;
     Color color;
+    void transform_in_place(Matrix3f transformation) {
+        triangle.transform_in_place(transformation);
+        for (int i = 0; i < 3; i ++) {
+            normals[i] = normals[i] * transformation;
+        }
+    }
 };
+
+struct PointLight {
+    Vector3f position;
+    float brightness;
+};
+
+struct AmbientLight {
+    float brightness;
+};
+
+float fast_minf(float a, float b) {
+    return a < b ? a : b;
+}
+
+Color operator*(Color c, float brightness) {
+    Color out;
+    out.r = fast_minf(c.r * brightness, 255);
+    out.g = fast_minf(c.g * brightness, 255);
+    out.b = fast_minf(c.b * brightness, 255);
+    out.a = fast_minf(c.a * brightness, 255);
+    return out;
+}
 
 
 SDL_Renderer* renderer;
@@ -30,19 +60,21 @@ Color screen[window_width][window_height];
 int camera_width = 16;
 int camera_height = 9;
 Vector3f camera_position = {0, 0, -5};
-float viewport_distance = 4;
+float viewport_distance = 4.8;
 //TODO: camera pointing direction
 
 
 std::vector<TriangleObject> triangles;
+std::vector<PointLight> point_lights;
+std::vector<AmbientLight> ambient_lights;
 Matrix3f y_rotation;
-float y_angle = 0;
 Matrix3f x_rotation;
-float x_angle = 0;
 Matrix3f z_rotation;
-float z_angle = 0;
 
 Matrix3f transformation;
+
+unsigned long long sum_render_time = 0;
+float num_frames = 0;
 
 Uint8 random_0_255() {
     return rand() % 256;
@@ -56,9 +88,16 @@ void define_scene() {
     srand(time(NULL));
     Model3D cube("assets/cube.obj");
     for (auto face : cube.faces) {
-        triangles.push_back({face, random_color()});
+        triangles.push_back({face.triangle, face.normals, random_color()});
     }
-    transformation.set_x_rotation(y_angle);
+    y_rotation.set_y_rotation(0.05f);
+    x_rotation.set_x_rotation(0.05f);
+    z_rotation.set_z_rotation(0.05f);
+
+    transformation = x_rotation * y_rotation * z_rotation;
+
+    point_lights.push_back({Vector3f(5, 5, 0), 1.5});
+    ambient_lights.push_back({0.3});
 }
 
 
@@ -75,22 +114,39 @@ std::pair<int, int> pixel_id(int id) {
     return {id % window_width, id / window_width};
 }
 
+float compute_lighting(Vector3f point, Vector3f normal) { //diffuse
+    float brightness = 0;
+    for (auto light : point_lights) {
+        Vector3f point_to_light = light.position - point;
+        float point_to_light_normal_dot = point_to_light.dot(normal);
+        if (point_to_light_normal_dot > 0) {
+            brightness += light.brightness * (point_to_light_normal_dot / (normal.get_length() * point_to_light.get_length()));
+        }
+    }
+    for (auto light : ambient_lights) {
+        brightness += light.brightness;
+    }
+    return brightness;
+}
+
 Color trace_ray(Line line) {
     float closest_intersection = std::numeric_limits<float>::max();
-    float closest_intersection_index = -1;
+    int closest_intersection_index = -1;
+    Vector3f closest_intersection_normal;
     int i = 0;
     for (auto triangle : triangles) {
-        float current_intersection = intersects(line, triangle.triangle.transform(transformation));
+        float current_intersection = intersects(line, triangle.triangle);
         if (current_intersection < closest_intersection && current_intersection > 1) {
             closest_intersection = current_intersection;
             closest_intersection_index = i;
+            closest_intersection_normal = triangle.triangle.normal;
         }
         i += 1;
     }
     if (closest_intersection_index == -1) {
         return Color({0, 0, 0, 0});
     } else {
-        return triangles[closest_intersection_index].color;
+        return triangles[closest_intersection_index].color * compute_lighting(line.get_point(closest_intersection), closest_intersection_normal);
     }
 }
 
@@ -171,28 +227,18 @@ int main() {
             }
         }
         blit();
+        num_frames ++;
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        std::cout << "Time to render = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+        std::cout << "Time to render = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]";
+        sum_render_time += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+        std::cout << " avg = " << (double) sum_render_time / num_frames << "[ms]" << std::endl;
         
         SDL_RenderPresent(renderer);
 
-        y_angle += 0.05;
-        if (y_angle >= 360.0f) {
-            y_angle -= 360.0f;
+        for (auto& triangle : triangles) {
+            triangle.transform_in_place(transformation);
         }
-        x_angle += 0.05;
-        if (x_angle >= 360.0f) {
-            x_angle -= 360.0f;
-        }
-        z_angle += 0.05;
-        if (z_angle >= 360.0f) {
-            z_angle -= 360.0f;
-        }
-        y_rotation.set_y_rotation(y_angle);
-        x_rotation.set_x_rotation(x_angle);
-        z_rotation.set_z_rotation(z_angle);
-
-        transformation = x_rotation * y_rotation * z_rotation;
     }
     SDL_Quit();
     return 0;

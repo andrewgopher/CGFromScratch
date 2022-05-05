@@ -40,6 +40,8 @@ struct Triangle {
     bool contains_point(Vector3f point);
     std::string to_string();
     Triangle transform(Matrix3f transformation);
+    void transform_in_place(Matrix3f transformation);
+    void recompute();
     Vector3f point1;
     Vector3f point2;
     Vector3f point3;
@@ -50,6 +52,14 @@ struct Triangle {
     Vector3f edge32;
     Vector3f edge13;
     Vector3f normal;
+};
+
+struct TriangleFace {
+    TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3, Vector3f normal1, Vector3f normal2,
+                 Vector3f normal3);
+    std::string to_string();
+    Triangle triangle;
+    std::array<Vector3f, 3> normals;
 };
 
 struct Plane {

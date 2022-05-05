@@ -4,6 +4,8 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include <sstream>
+
 
 class Model3D {
 public:
@@ -11,7 +13,8 @@ public:
     void open(std::string file_name);
     std::string to_string();
     std::vector<Vector3f> vertices;
-    std::vector<Triangle> faces;
+    std::vector<Vector3f> normals;
+    std::vector<TriangleFace> faces;
 };
 
 #endif

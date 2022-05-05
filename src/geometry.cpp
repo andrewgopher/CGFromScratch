@@ -85,6 +85,37 @@ Triangle Triangle::transform(Matrix3f transformation) {
     return Triangle(point1 * transformation, point2 * transformation, point3 * transformation);
 }
 
+void Triangle::transform_in_place(Matrix3f transformation) {
+    point1 = point1 * transformation;
+    point2 = point2 * transformation;
+    point3 = point3 * transformation;
+    recompute();
+}
+
+void Triangle::recompute() {
+    edge12 = point2 - point1;
+    edge23 = point3 - point2;
+    edge31 = point1 - point3;
+
+    edge21 = point1 - point2;
+    edge32 = point2 - point3;
+    edge13 = point3 - point1;
+
+    normal = (point3 - point1).cross(point2 - point1);
+}
+
+TriangleFace::TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3, Vector3f normal1,
+                           Vector3f normal2, Vector3f normal3) {
+    triangle = Triangle(arg_point1, arg_point2, arg_point3);
+    normals[0] = normal1;
+    normals[1] = normal2;
+    normals[2] = normal3;
+}
+
+std::string  TriangleFace::to_string() {
+    return triangle.to_string() + " | " + normals[0].to_string() + " | " + normals[1].to_string() + " | " + normals[2].to_string();
+}
+
 Plane::Plane(Vector3f arg_point, Vector3f arg_normal) {
     point = arg_point;
     normal = arg_normal;
@@ -172,7 +203,7 @@ void Matrix3f::set_z_rotation(float rotation) {
     arr[2][2] = cos(rotation);
 }
 
-Matrix3f operator*(Matrix3f m1, Matrix3f m2) { //TODO: fix
+Matrix3f operator*(Matrix3f m1, Matrix3f m2) {
     std::array<std::array<float, 3>, 3> new_arr = {{
                                                     {{m1[0][0] * m2[0][0] + m1[0][1] * m2[1][0] + m1[0][2] * m2[2][0], m1[0][0] * m2[0][1] + m1[0][1] * m2[1][1] + m1[0][2] * m2[2][1], m1[0][0] * m2[0][2] + m1[0][1] * m2[1][2] + m1[0][2] * m2[2][2]}},
                                                     {{m1[1][0] * m2[0][0] + m1[1][1] * m2[1][0] + m1[1][2] * m2[2][0], m1[1][0] * m2[0][1] + m1[1][1] * m2[1][1] + m1[1][2] * m2[2][1], m1[1][0] * m2[0][2] + m1[1][1] * m2[1][2] + m1[1][2] * m2[2][2]}},

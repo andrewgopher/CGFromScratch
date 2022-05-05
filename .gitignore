@@ -7,6 +7,9 @@
 *.vscode
 tags
 *.vim
+.idea
+.cmake
+Testing
 
 # Compiled files
 *.so
