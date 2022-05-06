@@ -112,6 +112,10 @@ TriangleFace::TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f ar
     normals[2] = normal3;
 }
 
+TriangleFace::TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3) {
+    triangle = Triangle(arg_point1, arg_point2, arg_point3);
+}
+
 std::string  TriangleFace::to_string() {
     return triangle.to_string() + " | " + normals[0].to_string() + " | " + normals[1].to_string() + " | " + normals[2].to_string();
 }

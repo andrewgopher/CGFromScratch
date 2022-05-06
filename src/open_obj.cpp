@@ -15,6 +15,9 @@ void Model3D::open(std::string file_name) { //TODO
             std::array<int, 3> point_indices;
             std::array<int, 3> normal_indices;
             std::array<int, 3> tex_indices;
+            bool has_points = false;
+            bool has_normals = false;
+            bool has_texes = false;
             for (int i = 0; i < 3; i ++) {
                 std::string curr_vertex, curr_index;
                 fin >> curr_vertex;
@@ -26,17 +29,24 @@ void Model3D::open(std::string file_name) { //TODO
                         continue;
                     }
                     if (j == 0) {
+                        has_points = true;
                         point_indices[i] = std::stoi(curr_index);
                     } else if (j == 1) {
+                        has_texes = true;
                         tex_indices[i] = std::stoi(curr_index);
                     } else if (j == 2) {
+                        has_normals = true;
                         normal_indices[i] = std::stoi(curr_index);
                     }
                     j ++;
                 }
             }
-            faces.emplace_back(vertices[point_indices[0] - 1], vertices[point_indices[1] - 1], vertices[point_indices[2] - 1],
+            if (has_points && has_normals) {
+                faces.emplace_back(vertices[point_indices[0] - 1], vertices[point_indices[1] - 1], vertices[point_indices[2] - 1],
                                normals[normal_indices[0] - 1], normals[normal_indices[1] - 1], normals[normal_indices[2] - 1]);
+            } else if (has_points) {
+                faces.emplace_back(vertices[point_indices[0] - 1], vertices[point_indices[1] - 1], vertices[point_indices[2] - 1]);
+            }
         } else if (curr_str == "vn") {
             Vector3f new_normal;
             fin >> new_normal.x >> new_normal.y >> new_normal.z;
@@ -45,7 +55,7 @@ void Model3D::open(std::string file_name) { //TODO
             fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         }
     }
-    std::cout << to_string();
+    std::cout << "opened " << file_name << "\n";
 }
 
 Model3D::Model3D(std::string file_name) {

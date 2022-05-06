@@ -86,7 +86,7 @@ Color random_color() {
 
 void define_scene() {
     srand(time(NULL));
-    Model3D cube("assets/cube.obj");
+    Model3D cube("assets/icosahedron.obj");
     for (auto face : cube.faces) {
         triangles.push_back({face.triangle, face.normals, random_color()});
     }
