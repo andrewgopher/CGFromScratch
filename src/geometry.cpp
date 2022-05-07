@@ -49,30 +49,19 @@ Triangle::Triangle(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3
     point1 = arg_point1;
     point2 = arg_point2;
     point3 = arg_point3;
-    edge12 = point2 - point1;
-    edge23 = point3 - point2;
-    edge31 = point1 - point3;
-
-    edge21 = point1 - point2;
-    edge32 = point2 - point3;
-    edge13 = point3 - point1;
-
-    normal = (point3 - point1).cross(point2 - point1);
+    recompute();
 }
 
 bool Triangle::contains_point(Vector3f point) {
     Vector3f v2 = point - point1;
 
-    float dot00 = edge13.dot(edge13);
-    float dot01 = edge13.dot(edge12);
     float dot02 = edge13.dot(v2);
-    float dot11 = edge12.dot(edge12);
     float dot12 = edge12.dot(v2);
 
-    float inv_denom = 1 / (dot00 * dot11 - dot01 * dot01);
+    float inv_denom = 1.0f / (edge13_edge13_dot * edge12_edge12_dot - edge13_edge12_dot * edge13_edge12_dot);
 
-    float area1 = (dot11 * dot02 - dot01 * dot12) * inv_denom;
-    float area2 = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+    float area1 = (edge12_edge12_dot * dot02 - edge13_edge12_dot * dot12) * inv_denom;
+    float area2 = (edge13_edge13_dot * dot12 - edge13_edge12_dot * dot02) * inv_denom;
 
     return area1 >= 0 && area2 >= 0 && area1 <= 1 && area2 <= 1 && area1 + area2 <= 1;
 }
@@ -101,7 +90,10 @@ void Triangle::recompute() {
     edge32 = point2 - point3;
     edge13 = point3 - point1;
 
-    normal = (point3 - point1).cross(point2 - point1);
+    normal = (edge12).cross(edge13);
+    edge13_edge13_dot = edge13.dot(edge13);
+    edge13_edge12_dot = edge13.dot(edge12);
+    edge12_edge12_dot = edge12.dot(edge12);
 }
 
 TriangleFace::TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3, Vector3f normal1,
@@ -145,20 +137,21 @@ float intersects(Line line, Plane plane) {
     float plane_normal_line_slope_dot = plane.normal.dot(line.slope);
     if (plane_normal_line_slope_dot == 0) {
         return std::numeric_limits<float>::max();
+    } else {
+        return (-line.point.dot(plane.normal) + plane.point_normal_dot) / plane_normal_line_slope_dot;
     }
-    return (-line.point.dot(plane.normal) + plane.point_normal_dot) / plane_normal_line_slope_dot;
 }
 
+
 float intersects(Line line, Triangle triangle) {
-    float possible_intersection = intersects(line, Plane(triangle.point1, triangle.normal));
-    if (possible_intersection == std::numeric_limits<float>::max()) {
-        return std::numeric_limits<float>::max();
-    }
-    if (triangle.contains_point(line.get_point(possible_intersection))) {
-        return possible_intersection;
-    } else {
-        return std::numeric_limits<float>::max();
-    }
+    float det = -line.slope.dot(triangle.normal);
+    float inv_det = 1.0f / det;
+    Vector3f AO = line.point - triangle.point1;
+    Vector3f DAO = AO.cross(line.slope);
+    float u = triangle.edge13.dot(DAO) * inv_det;
+    float v = -triangle.edge12.dot(DAO) * inv_det;
+    float t = AO.dot(triangle.normal) * inv_det;
+    return (det >= 1e-6 && t >= 0 && u >= 0 && v >= 0 && (u + v) <= 1) ? t : std::numeric_limits<float>::max();
 }
 
 Matrix3f::Matrix3f(std::array<std::array<float, 3>, 3> arg_arr) {

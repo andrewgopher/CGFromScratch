@@ -52,6 +52,10 @@ struct Triangle {
     Vector3f edge32;
     Vector3f edge13;
     Vector3f normal;
+
+    float edge13_edge13_dot;
+    float edge13_edge12_dot;
+    float edge12_edge12_dot;
 };
 
 struct TriangleFace {

@@ -132,21 +132,19 @@ float compute_lighting(Vector3f point, Vector3f normal) { //diffuse
 Color trace_ray(Line line) {
     float closest_intersection = std::numeric_limits<float>::max();
     int closest_intersection_index = -1;
-    Vector3f closest_intersection_normal;
     int i = 0;
     for (auto triangle : triangles) {
         float current_intersection = intersects(line, triangle.triangle);
         if (current_intersection < closest_intersection && current_intersection > 1) {
             closest_intersection = current_intersection;
             closest_intersection_index = i;
-            closest_intersection_normal = triangle.triangle.normal;
         }
         i += 1;
     }
     if (closest_intersection_index == -1) {
         return Color({0, 0, 0, 0});
     } else {
-        return triangles[closest_intersection_index].color * compute_lighting(line.get_point(closest_intersection), closest_intersection_normal);
+        return triangles[closest_intersection_index].color * compute_lighting(line.get_point(closest_intersection), triangles[closest_intersection_index].triangle.normal);
     }
 }
 
@@ -164,7 +162,6 @@ void blit() {
             draw_point(i, j, screen[i][j]);
         }
     }
-    draw_point(window_width / 2, window_height / 2, {0, 255, 0, 255});
 }
 
 int main() {
