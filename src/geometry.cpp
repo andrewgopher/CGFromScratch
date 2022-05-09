@@ -1,4 +1,5 @@
 #include "geometry.h"
+#include "float_limits_def.h"
 #include <cmath>
 #include <iterator>
 
@@ -45,10 +46,15 @@ float Vector3f::get_length() {
     return sqrt(x * x + y * y + z * z);
 }
 
+bool Vector3f::all_less_than(Vector3f v) {
+    return x < v.x && y < v.y && z < v.z;
+}
+
 Triangle::Triangle(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3) {
     point1 = arg_point1;
     point2 = arg_point2;
     point3 = arg_point3;
+
     recompute();
 }
 
@@ -94,6 +100,10 @@ void Triangle::recompute() {
     edge13_edge13_dot = edge13.dot(edge13);
     edge13_edge12_dot = edge13.dot(edge12);
     edge12_edge12_dot = edge12.dot(edge12);
+
+    points[0] = point1;
+    points[1] = point2;
+    points[2] = point3;
 }
 
 TriangleFace::TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3, Vector3f normal1,
@@ -136,14 +146,14 @@ Vector3f Line::get_point(float param) {
 float intersects(Line line, Plane plane) {
     float plane_normal_line_slope_dot = plane.normal.dot(line.slope);
     if (plane_normal_line_slope_dot == 0) {
-        return std::numeric_limits<float>::max();
+        return FLOAT_MAX;
     } else {
         return (-line.point.dot(plane.normal) + plane.point_normal_dot) / plane_normal_line_slope_dot;
     }
 }
 
 
-float intersects(Line line, Triangle triangle) {
+float intersects(Line line, Triangle triangle) { //credit: https://stackoverflow.com/a/42752998/12620352 second part
     float det = -line.slope.dot(triangle.normal);
     float inv_det = 1.0f / det;
     Vector3f AO = line.point - triangle.point1;
@@ -151,7 +161,7 @@ float intersects(Line line, Triangle triangle) {
     float u = triangle.edge13.dot(DAO) * inv_det;
     float v = -triangle.edge12.dot(DAO) * inv_det;
     float t = AO.dot(triangle.normal) * inv_det;
-    return (det >= 1e-6 && t >= 0 && u >= 0 && v >= 0 && (u + v) <= 1) ? t : std::numeric_limits<float>::max();
+    return (det >= 1e-6 && t >= 0 && u >= 0 && v >= 0 && (u + v) <= 1) ? t : FLOAT_MAX;
 }
 
 Matrix3f::Matrix3f(std::array<std::array<float, 3>, 3> arg_arr) {
@@ -207,4 +217,49 @@ Matrix3f operator*(Matrix3f m1, Matrix3f m2) {
                                                     {{m1[2][0] * m2[0][0] + m1[2][1] * m2[1][0] + m1[2][2] * m2[2][0], m1[2][0] * m2[0][1] + m1[2][1] * m2[1][1] + m1[2][2] * m2[2][1], m1[2][0] * m2[0][2] + m1[2][1] * m2[1][2] + m1[2][2] * m2[2][2]}}
                                                     }};
     return Matrix3f(new_arr);
+}
+
+AABB::AABB(Vector3f arg_min, Vector3f arg_max) {
+    min = arg_min;
+    max = arg_max;
+    recompute();
+}
+
+void AABB::recompute() {
+    min_x_plane = Plane(min, Vector3f(max.x - min.x, 0, 0));
+    min_y_plane = Plane(min, Vector3f(0, max.y - min.y, 0));
+    min_z_plane = Plane(min, Vector3f(0, 0, max.z - min.z));
+    max_x_plane = Plane(max, Vector3f(min.x - max.x, 0, 0));
+    max_y_plane = Plane(max, Vector3f(0, min.y - max.y, 0));
+    max_z_plane = Plane(max, Vector3f(0, 0, min.z - max.z));
+
+
+    planes[0] = min_x_plane;
+    planes[1] = min_y_plane;
+    planes[2] = min_z_plane;
+    planes[3] = max_x_plane;
+    planes[4] = max_y_plane;
+    planes[5] = max_z_plane;
+}
+
+bool AABB::contains(Vector3f point) {
+    return (min - Vector3f(1e-5, 1e-5, 1e-5)).all_less_than(point) && point.all_less_than(max + Vector3f(1e-5, 1e-5, 1e-5));
+}
+
+bool in_between(float a, float b, float c) {
+    return (a >= b && a <= c) || (a <= b && a >= c);
+}
+
+bool is_intersects(Line line, AABB aabb) {
+    for (auto plane : aabb.planes) {
+        float current_intersection = intersects(line, plane);
+        if (current_intersection != FLOAT_MAX && aabb.contains(line.get_point(current_intersection))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string AABB::to_string() {
+    return min.to_string() + " | " + max.to_string();
 }

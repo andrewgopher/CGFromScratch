@@ -8,6 +8,15 @@
 #include <array>
 #include "geometry.h"
 #include "open_obj.h"
+#include "float_limits_def.h"
+
+float fast_minf(float a, float b) {
+    return a < b ? a : b;
+}
+
+float fast_maxf(float a, float b) {
+    return a > b ? a : b;
+}
 
 struct Color {
     Uint8 r;
@@ -28,6 +37,46 @@ struct TriangleObject {
     }
 };
 
+struct Mesh {
+    std::vector<TriangleObject> triangles;
+    AABB bounding_box;
+    Mesh(std::vector<TriangleFace>& faces) {
+        for (auto& face : faces) {
+            triangles.push_back({face.triangle, face.normals, Color({255, 255, 255, 255})});
+        }
+        compute_bounding_box();
+    }
+    void compute_bounding_box() {
+        float min_x = FLOAT_MAX;
+        float min_y = FLOAT_MAX;
+        float min_z = FLOAT_MAX;
+        float max_x = FLOAT_MIN;
+        float max_y = FLOAT_MIN;
+        float max_z = FLOAT_MIN;
+
+        int i = 0;
+        for (auto& triangle : triangles) {
+            for (auto point : triangle.triangle.points) {
+                min_x = fast_minf(min_x, point.x);
+                min_y = fast_minf(min_y, point.y);
+                min_z = fast_minf(min_z, point.z);
+                max_x = fast_maxf(max_x, point.x);
+                max_y = fast_maxf(max_y, point.y);
+                max_z = fast_maxf(max_z, point.z);
+            }
+            i++;
+        }
+
+        bounding_box = AABB(Vector3f(min_x, min_y, min_z), Vector3f(max_x, max_y, max_z));
+    }
+    void transform_in_place(Matrix3f transformation) {
+        for (auto& triangle : triangles) {
+            triangle.transform_in_place(transformation);
+        }
+        compute_bounding_box();
+    }
+};
+
 struct PointLight {
     Vector3f position;
     float brightness;
@@ -36,10 +85,6 @@ struct PointLight {
 struct AmbientLight {
     float brightness;
 };
-
-float fast_minf(float a, float b) {
-    return a < b ? a : b;
-}
 
 Color operator*(Color c, float brightness) {
     Color out;
@@ -57,14 +102,14 @@ const int window_height = 450;
 
 Color screen[window_width][window_height];
 
-int camera_width = 16;
-int camera_height = 9;
-Vector3f camera_position = {0, 0, -5};
-float viewport_distance = 4;
+float camera_width = 8;
+float camera_height = 4.5;
+Vector3f camera_position = {0, 2, -10};
+float viewport_distance = 5;
 //TODO: camera pointing direction
 
 
-std::vector<TriangleObject> triangles;
+std::vector<Mesh> meshes;
 std::vector<PointLight> point_lights;
 std::vector<AmbientLight> ambient_lights;
 Matrix3f y_rotation;
@@ -86,10 +131,9 @@ Color random_color() {
 
 void define_scene() {
     srand(time(NULL));
-    Model3D cube("assets/icosahedron.obj");
-    for (auto face : cube.faces) {
-        triangles.push_back({face.triangle, face.normals, random_color()});
-    }
+    Model3D object("assets/teapot.obj");
+    meshes.emplace_back(Mesh(object.faces));
+
     y_rotation.set_y_rotation(0.05f);
     x_rotation.set_x_rotation(0.05f);
     z_rotation.set_z_rotation(0.05f);
@@ -116,35 +160,44 @@ std::pair<int, int> pixel_id(int id) {
 
 float compute_lighting(Vector3f point, Vector3f normal) { //diffuse
     float brightness = 0;
-    for (auto light : point_lights) {
+    for (auto& light : point_lights) {
         Vector3f point_to_light = light.position - point;
         float point_to_light_normal_dot = point_to_light.dot(normal);
         if (point_to_light_normal_dot > 0) {
             brightness += light.brightness * (point_to_light_normal_dot / (normal.get_length() * point_to_light.get_length()));
         }
     }
-    for (auto light : ambient_lights) {
+    for (auto& light : ambient_lights) {
         brightness += light.brightness;
     }
     return brightness;
 }
 
 Color trace_ray(Line line) {
-    float closest_intersection = std::numeric_limits<float>::max();
-    int closest_intersection_index = -1;
+    float closest_intersection = FLOAT_MAX;
+    int closest_intersection_mesh_index = -1;
+    int closest_intersection_triangle_index = -1;
     int i = 0;
-    for (auto triangle : triangles) {
-        float current_intersection = intersects(line, triangle.triangle);
-        if (current_intersection < closest_intersection && current_intersection > 1) {
-            closest_intersection = current_intersection;
-            closest_intersection_index = i;
+    for (auto& mesh : meshes) {
+        if (is_intersects(line, mesh.bounding_box)) {
+            int j = 0;
+            for (auto &triangle: mesh.triangles) {
+                float current_intersection = intersects(line, triangle.triangle);
+                if (current_intersection < closest_intersection && current_intersection > 1) {
+                    closest_intersection = current_intersection;
+                    closest_intersection_mesh_index = i;
+
+                    closest_intersection_triangle_index = j;
+                }
+                j++;
+            }
         }
-        i += 1;
+        i ++;
     }
-    if (closest_intersection_index == -1) {
+    if (closest_intersection_mesh_index == -1) {
         return Color({0, 0, 0, 0});
     } else {
-        return triangles[closest_intersection_index].color * compute_lighting(line.get_point(closest_intersection), triangles[closest_intersection_index].triangle.normal);
+        return meshes[closest_intersection_mesh_index].triangles[closest_intersection_triangle_index].color * compute_lighting(line.get_point(closest_intersection), meshes[closest_intersection_mesh_index].triangles[closest_intersection_triangle_index].triangle.normal);
     }
 }
 
@@ -233,8 +286,8 @@ int main() {
         
         SDL_RenderPresent(renderer);
 
-        for (auto& triangle : triangles) {
-            triangle.transform_in_place(transformation);
+        for (auto& mesh : meshes) {
+            mesh.transform_in_place(transformation);
         }
     }
     SDL_Quit();

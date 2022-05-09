@@ -14,6 +14,7 @@ struct Vector3f {
     float get_length();
     Vector3f cross(Vector3f v);
     std::string to_string();
+    bool all_less_than(Vector3f v);
 };
 
 struct Matrix3f {
@@ -56,6 +57,8 @@ struct Triangle {
     float edge13_edge13_dot;
     float edge13_edge12_dot;
     float edge12_edge12_dot;
+
+    std::array<Vector3f, 3> points;
 };
 
 struct TriangleFace {
@@ -84,7 +87,28 @@ struct Line {
     Vector3f slope;
 };
 
+struct AABB {
+    AABB() {};
+    AABB(Vector3f arg_min, Vector3f arg_max);
+    void recompute();
+    bool contains(Vector3f point);
+    std::string to_string();
+    Vector3f min = {0, 0, 0};
+    Vector3f max = {0, 0, 0};
+    Plane min_x_plane;
+    Plane min_y_plane;
+    Plane min_z_plane;
+    Plane max_x_plane;
+    Plane max_y_plane;
+    Plane max_z_plane;
+
+    std::array<Plane, 6> planes;
+};
+
+bool in_between(float a, float b, float c);
+
 float intersects(Line line, Triangle triangle);
 float intersects(Line line, Plane plane);
+bool is_intersects(Line line, AABB aabb);
 
 #endif
