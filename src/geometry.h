@@ -5,7 +5,7 @@
 #include <array>
 #include "float_limits_def.h"
 
-//TODO: Vector4f for homogenous coordinates
+//TODO: Vector4f for homogeneous coordinates
 
 struct Vector3f {
     Vector3f() {};

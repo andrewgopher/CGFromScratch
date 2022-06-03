@@ -177,7 +177,7 @@ struct Mesh {
         compute_octree();
     }
 
-    void translate(Vector3f translation) { //TODO: homogenous coordinates to just use transform_in_place instead
+    void translate(Vector3f translation) { //TODO: homogeneous coordinates to just use transform_in_place instead
         for (auto& triangle :triangles) {
             triangle.translate(translation);
         }
