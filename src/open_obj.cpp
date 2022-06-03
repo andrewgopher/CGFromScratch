@@ -1,6 +1,7 @@
 #include "open_obj.h"
 
 void Model3D::open(std::string file_name) { //TODO
+    std::cout << "opening " << file_name << "\n";
     vertices.clear();
     faces.clear();
     std::ifstream fin;
@@ -55,7 +56,7 @@ void Model3D::open(std::string file_name) { //TODO
             fin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         }
     }
-    std::cout << "opened " << file_name << "\n";
+    std::cout << "finished opening " << file_name << "\n";
 }
 
 Model3D::Model3D(std::string file_name) {

@@ -3,8 +3,6 @@
 #include <vector>
 #include <chrono>
 #include <thread>
-#include <ctime>
-#include <cstdlib>
 #include <array>
 #include "geometry.h"
 #include "open_obj.h"
@@ -35,16 +33,118 @@ struct TriangleObject {
             normals[i] = normals[i] * transformation;
         }
     }
+
+    void translate(Vector3f& translation) {
+        triangle.translate(translation);
+    }
+};
+
+struct Octree {
+    Octree* children[8] = {nullptr};
+    std::vector<int> triangle_indices;
+    AABB container;
+    int depth = 1;
+    const static int max_depth = 6;
+
+
+    Octree(AABB arg_container, int arg_depth) {
+        container = arg_container;
+        depth = arg_depth;
+    };
+
+    void divide() {
+#define cmin container.min
+#define cmax container.max
+        children[0] = new Octree(AABB(cmin, cmax / 2), depth + 1);
+        children[1] = new Octree(AABB({cmin.x, cmin.y, cmax.z / 2}, {cmax.x / 2, cmax.y / 2, cmax.z}), depth + 1);
+        children[2] = new Octree(AABB({cmin.x, cmax.y / 2, cmin.z}, {cmax.x / 2, cmax.y, cmax.z / 2}), depth + 1);
+        children[3] = new Octree(AABB({cmin.x, cmax.y / 2, cmax.z / 2}, {cmax.x / 2, cmax.y, cmax.z}), depth + 1);
+        children[4] = new Octree(AABB({cmax.x / 2, cmin.y, cmin.z}, {cmax.x, cmax.y / 2, cmax.z / 2}), depth + 1);
+        children[5] = new Octree(AABB({cmax.x / 2, cmin.y, cmax.z / 2}, {cmax.x, cmax.y / 2, cmax.z}), depth + 1);
+        children[6] = new Octree(AABB({cmax.x / 2, cmax.y / 2, cmin.z}, {cmax.x, cmax.y , cmax.z / 2}), depth + 1);
+        children[7] = new Octree(AABB(cmax / 2, cmax), depth + 1);
+#undef cmin
+#undef cmax
+    };
+
+    void add_triangles(std::vector<TriangleObject>& triangles, std::vector<int>& indices) {
+
+        for (auto& index : indices) {
+            if (is_intersects(triangles[index].triangle, container)) {
+                triangle_indices.push_back(index);
+            }
+        }
+
+
+        if (depth < triangle_indices.size() && depth < max_depth) {
+            if (children[0] == nullptr) divide();
+            for (auto& child : children) {
+                child->add_triangles(triangles, triangle_indices);
+            }
+        }
+    }
+
+    void add_triangles(std::vector<TriangleObject>& triangles) {
+        int i = 0;
+        for (auto& triangle : triangles) {
+            if (is_intersects(triangle.triangle, container)) {
+                triangle_indices.push_back(i);
+            }
+            i++;
+        }
+
+        if (depth < triangle_indices.size() && depth < max_depth) {
+            if (children[0] == nullptr) divide();
+            for (auto& child : children) {
+                child->add_triangles(triangles, triangle_indices);
+            }
+        }
+    }
+
+
+    std::pair<float, int> intersect(std::vector<TriangleObject>& triangles, Line& line) { //run reset_visited() on first call (non-recursive call)
+        if (intersects(line, container)[0] != FLOAT_MAX) {
+            if (children[0] == nullptr) {
+                float closest_intersection = FLOAT_MAX;
+                int closest_intersection_triangle_index = -1;
+                for (auto& triangle_index : triangle_indices) {
+                    float current_intersection = intersects(line, triangles[triangle_index].triangle);
+                    if (current_intersection < closest_intersection) {
+                        closest_intersection = current_intersection;
+                        closest_intersection_triangle_index = triangle_index;
+                    }
+                }
+                return {closest_intersection, closest_intersection_triangle_index};
+            } else {
+                float closest_intersection = FLOAT_MAX;
+                int closest_intersection_triangle_index = -1;
+                for (auto& child : children) {
+                    if (is_intersects(line, child->container) && child->triangle_indices.size() > 0) {
+                        std::pair<float, int> current_intersection = child->intersect(triangles, line);
+                        if (current_intersection.first < closest_intersection) {
+                            closest_intersection = current_intersection.first;
+                            closest_intersection_triangle_index = current_intersection.second;
+                        }
+                    }
+                }
+                return {closest_intersection, closest_intersection_triangle_index};
+            }
+        } else {
+            return {FLOAT_MAX, -1};
+        }
+    }
 };
 
 struct Mesh {
     std::vector<TriangleObject> triangles;
     AABB bounding_box;
+    Octree* octree = nullptr;
     Mesh(std::vector<TriangleFace>& faces) {
         for (auto& face : faces) {
             triangles.push_back({face.triangle, face.normals, Color({255, 255, 255, 255})});
         }
         compute_bounding_box();
+        compute_octree();
     }
     void compute_bounding_box() {
         float min_x = FLOAT_MAX;
@@ -56,7 +156,7 @@ struct Mesh {
 
         int i = 0;
         for (auto& triangle : triangles) {
-            for (auto point : triangle.triangle.points) {
+            for (auto point : triangle.triangle.vertices) {
                 min_x = fast_minf(min_x, point.x);
                 min_y = fast_minf(min_y, point.y);
                 min_z = fast_minf(min_z, point.z);
@@ -69,11 +169,33 @@ struct Mesh {
 
         bounding_box = AABB(Vector3f(min_x, min_y, min_z), Vector3f(max_x, max_y, max_z));
     }
-    void transform_in_place(Matrix3f transformation) {
+    void transform_in_place(Matrix3f& transformation) {
         for (auto& triangle : triangles) {
             triangle.transform_in_place(transformation);
         }
         compute_bounding_box();
+        compute_octree();
+    }
+
+    void translate(Vector3f translation) { //TODO: homogenous coordinates to just use transform_in_place instead
+        for (auto& triangle :triangles) {
+            triangle.translate(translation);
+        }
+        //TODO: no need to completely recompute; just translate
+        compute_bounding_box();
+        compute_octree();
+    }
+
+    void compute_octree() {
+        std::cout << "computing octree...\n";
+        delete octree;
+        octree = new Octree(bounding_box, 1);
+        octree->add_triangles(triangles);
+        std::cout << "finished computing octree\n";
+    }
+
+    std::pair<float, int> intersect(Line line) {
+        return octree->intersect(triangles, line);
     }
 };
 
@@ -112,14 +234,16 @@ float viewport_distance = 5;
 std::vector<Mesh> meshes;
 std::vector<PointLight> point_lights;
 std::vector<AmbientLight> ambient_lights;
-Matrix3f y_rotation;
-Matrix3f x_rotation;
-Matrix3f z_rotation;
+Matrix3f teapot_y_rotation;
+Matrix3f teapot_x_rotation;
+Matrix3f teapot_z_rotation;
 
-Matrix3f transformation;
+Matrix3f teapot_transformation;
+
+Matrix3f icosahedron_transformation;
 
 unsigned long long sum_render_time = 0;
-float num_frames = 0;
+int num_frames = 0;
 
 Uint8 random_0_255() {
     return rand() % 256;
@@ -130,18 +254,26 @@ Color random_color() {
 }
 
 void define_scene() {
+    std::cout << "defining scene/loading objects...\n";
     srand(time(NULL));
-    Model3D object("assets/teapot.obj");
-    meshes.emplace_back(Mesh(object.faces));
+    Model3D teapot("assets/teapot.obj");
+    meshes.emplace_back(Mesh(teapot.faces));
 
-    y_rotation.set_y_rotation(0.05f);
-    x_rotation.set_x_rotation(0.05f);
-    z_rotation.set_z_rotation(0.05f);
+    teapot_y_rotation.set_y_rotation(0.05f);
+    teapot_x_rotation.set_x_rotation(0.05f);
+    teapot_z_rotation.set_z_rotation(0.05f);
 
-    transformation = x_rotation * y_rotation * z_rotation;
+    teapot_transformation = teapot_x_rotation * teapot_y_rotation * teapot_z_rotation;
 
     point_lights.push_back({Vector3f(5, 5, 0), 1.5});
     ambient_lights.push_back({0.3});
+
+    Model3D icosahedron("assets/icosahedron.obj");
+    meshes.emplace_back(Mesh(icosahedron.faces));
+    meshes[1].translate(Vector3f(-5, 0, 0));
+
+
+    std::cout << "finished defining scene\n";
 }
 
 
@@ -179,18 +311,11 @@ Color trace_ray(Line line) {
     int closest_intersection_triangle_index = -1;
     int i = 0;
     for (auto& mesh : meshes) {
-        if (is_intersects(line, mesh.bounding_box)) {
-            int j = 0;
-            for (auto &triangle: mesh.triangles) {
-                float current_intersection = intersects(line, triangle.triangle);
-                if (current_intersection < closest_intersection && current_intersection > 1) {
-                    closest_intersection = current_intersection;
-                    closest_intersection_mesh_index = i;
-
-                    closest_intersection_triangle_index = j;
-                }
-                j++;
-            }
+        std::pair<float, int> current_intersection = mesh.intersect(line);
+        if (current_intersection.first < closest_intersection && current_intersection.first > 1) {
+            closest_intersection = current_intersection.first;
+            closest_intersection_mesh_index = i;
+            closest_intersection_triangle_index = current_intersection.second;
         }
         i ++;
     }
@@ -242,7 +367,7 @@ int main() {
     );
     bool running = true;
     Uint32 ticks_count = 0;
-    float frame_rate = 60.0;
+    float frame_rate = 60.0f;
     unsigned int cpu_count = std::thread::hardware_concurrency();
     while (running) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
@@ -255,6 +380,7 @@ int main() {
             }
         }
         while (!SDL_TICKS_PASSED(SDL_GetTicks(), ticks_count + 1000.0f / frame_rate));
+        ticks_count = SDL_GetTicks();
         
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         if (cpu_count == 0) {
@@ -286,9 +412,8 @@ int main() {
         
         SDL_RenderPresent(renderer);
 
-        for (auto& mesh : meshes) {
-            mesh.transform_in_place(transformation);
-        }
+        meshes[0].transform_in_place(teapot_transformation); //TODO:
+        meshes[1].translate(Vector3f((num_frames - 1) % 41 < 20 ? 0.05f : -0.05f, 0, 0));
     }
     SDL_Quit();
     return 0;

@@ -4,5 +4,5 @@
 #endif
 
 #ifndef FLOAT_MIN
-#define FLOAT_MIN std::numeric_limits<float>::min()
+#define FLOAT_MIN std::numeric_limits<float>::lowest()
 #endif

@@ -42,12 +42,24 @@ Vector3f operator*(Vector3f v, Matrix3f m) {
     return Vector3f(v.x * m[0][0] + v.y * m[0][1] + v.z * m[0][2], v.x * m[1][0] + v.y * m[1][1] + v.z * m[1][2], v.x * m[2][0] + v.y * m[2][1] + v.z * m[2][2]);
 }
 
+Vector3f operator/(Vector3f v, float f) {
+    return Vector3f(v.x / f, v.y / f, v.z / f);
+}
+
+Vector3f operator/(Vector3f v, int i) {
+    return Vector3f(v.x / i, v.y / i, v.z / i);
+}
+
 float Vector3f::get_length() {
     return sqrt(x * x + y * y + z * z);
 }
 
 bool Vector3f::all_less_than(Vector3f v) {
     return x < v.x && y < v.y && z < v.z;
+}
+
+bool operator<(Vector3f v1, Vector3f v2) {
+    return v1.x < v2.x && v1.y < v2.y && v1.z < v2.z;
 }
 
 Triangle::Triangle(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3) {
@@ -58,7 +70,7 @@ Triangle::Triangle(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3
     recompute();
 }
 
-bool Triangle::contains_point(Vector3f point) {
+bool Triangle::contains_point(Vector3f& point) {
     Vector3f v2 = point - point1;
 
     float dot02 = edge13.dot(v2);
@@ -87,6 +99,13 @@ void Triangle::transform_in_place(Matrix3f transformation) {
     recompute();
 }
 
+void Triangle::translate(Vector3f& translation) {
+    point1 = point1 + translation;
+    point2 = point2 + translation;
+    point3 = point3 + translation;
+    recompute();
+}
+
 void Triangle::recompute() {
     edge12 = point2 - point1;
     edge23 = point3 - point2;
@@ -101,9 +120,17 @@ void Triangle::recompute() {
     edge13_edge12_dot = edge13.dot(edge12);
     edge12_edge12_dot = edge12.dot(edge12);
 
-    points[0] = point1;
-    points[1] = point2;
-    points[2] = point3;
+    vertices[0] = point1;
+    vertices[1] = point2;
+    vertices[2] = point3;
+
+    line12.point = point1;
+    line23.point = point2;
+    line31.point = point3;
+
+    line12.slope = point2 - point1;
+    line23.slope = point3 - point2;
+    line31.slope = point1 - point3;
 }
 
 TriangleFace::TriangleFace(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3, Vector3f normal1,
@@ -143,7 +170,7 @@ Vector3f Line::get_point(float param) {
     return point + param * slope;
 }
 
-float intersects(Line line, Plane plane) {
+float intersects(Line& line, Plane& plane) {
     float plane_normal_line_slope_dot = plane.normal.dot(line.slope);
     if (plane_normal_line_slope_dot == 0) {
         return FLOAT_MAX;
@@ -153,7 +180,7 @@ float intersects(Line line, Plane plane) {
 }
 
 
-float intersects(Line line, Triangle triangle) { //credit: https://stackoverflow.com/a/42752998/12620352 second part
+float intersects(Line& line, Triangle& triangle) { //credit: https://stackoverflow.com/a/42752998/12620352 second part
     float det = -line.slope.dot(triangle.normal);
     float inv_det = 1.0f / det;
     Vector3f AO = line.point - triangle.point1;
@@ -240,18 +267,26 @@ void AABB::recompute() {
     planes[3] = max_x_plane;
     planes[4] = max_y_plane;
     planes[5] = max_z_plane;
+    vertices[0] = min;
+    vertices[1] = Vector3f(min.x, min.y, max.z);
+    vertices[2] = Vector3f(min.x, max.y, min.z);
+    vertices[3] = Vector3f(min.x, max.y, max.z);
+    vertices[4] = Vector3f(max.x, min.y, min.z);
+    vertices[5] = Vector3f(max.x, min.y, max.z);
+    vertices[6] = Vector3f(max.x, max.y, min.z);
+    vertices[7] = max;
 }
 
 bool AABB::contains(Vector3f point) {
-    return (min - Vector3f(1e-5, 1e-5, 1e-5)).all_less_than(point) && point.all_less_than(max + Vector3f(1e-5, 1e-5, 1e-5));
+    return (min - Vector3f(1e-5, 1e-5, 1e-5)) < point && point < (max + Vector3f(1e-5, 1e-5, 1e-5));
 }
 
 bool in_between(float a, float b, float c) {
     return (a >= b && a <= c) || (a <= b && a >= c);
 }
 
-bool is_intersects(Line line, AABB aabb) {
-    for (auto plane : aabb.planes) {
+bool is_intersects(Line& line, AABB& aabb) {
+    for (auto& plane : aabb.planes) {
         float current_intersection = intersects(line, plane);
         if (current_intersection != FLOAT_MAX && aabb.contains(line.get_point(current_intersection))) {
             return true;
@@ -262,4 +297,61 @@ bool is_intersects(Line line, AABB aabb) {
 
 std::string AABB::to_string() {
     return min.to_string() + " | " + max.to_string();
+}
+
+std::array<float, 2> intersects(Line& line, AABB& aabb) {
+    std::array<float, 2> result = {FLOAT_MAX, FLOAT_MAX};
+    int i = 0;
+    for (auto& plane : aabb.planes) {
+        float current_intersection = intersects(line, plane);
+        if (current_intersection != FLOAT_MAX && aabb.contains(line.get_point(current_intersection))) {
+            result[i] = current_intersection;
+            i++;
+            i%=2;
+        }
+    }
+    return result;
+}
+
+float project(Vector3f& point, Line& line) {
+    return (line.point - point).dot(line.slope) / line.slope.dot(line.slope);
+}
+
+bool separates(Triangle& triangle, AABB& aabb, Vector3f axis) {
+    float min_aabb_project = FLOAT_MAX;
+    float max_aabb_project = FLOAT_MIN;
+    float min_triangle_project = FLOAT_MAX;
+    float max_triangle_project = FLOAT_MIN;
+
+    for (int i = 0; i < 8; i++) {
+        float current_projection = aabb.vertices[i].dot(axis);
+        if (current_projection < min_aabb_project) {
+            min_aabb_project = current_projection;
+        }
+        if (current_projection > max_aabb_project) {
+            max_aabb_project = current_projection;
+        }
+    }
+
+    for (int i = 0; i < 3; i++) {
+        float current_projection = triangle.vertices[i].dot(axis);
+        if (current_projection < min_triangle_project) {
+            min_triangle_project = current_projection;
+        }
+        if (current_projection > max_triangle_project) {
+            max_triangle_project = current_projection;
+        }
+    }
+    return (max_aabb_project < min_triangle_project || max_triangle_project < min_aabb_project);
+}
+
+bool is_intersects(Triangle& triangle, AABB& aabb) {
+#define separate(axis) separates(triangle, aabb, axis)
+    return !separate(unit_x_vector) && !separate(unit_y_vector) && !separate(unit_z_vector) && !separate(triangle.normal)
+        && !separate(unit_x_vector.cross(triangle.edge12)) && !separate(unit_x_vector.cross(triangle.edge23))
+        && !separate(unit_x_vector.cross(triangle.edge31)) && !separate(unit_y_vector.cross(triangle.edge12))
+        && !separate(unit_y_vector.cross(triangle.edge23)) && !separate(unit_y_vector.cross(triangle.edge31))
+        && !separate(unit_z_vector.cross(triangle.edge12)) && !separate(unit_z_vector.cross(triangle.edge23))
+        && !separate(unit_z_vector.cross(triangle.edge31));
+#undef separate
 }

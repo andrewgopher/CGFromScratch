@@ -3,6 +3,9 @@
 #include <limits>
 #include <iostream>
 #include <array>
+#include "float_limits_def.h"
+
+//TODO: Vector4f for homogenous coordinates
 
 struct Vector3f {
     Vector3f() {};
@@ -16,6 +19,16 @@ struct Vector3f {
     std::string to_string();
     bool all_less_than(Vector3f v);
 };
+
+bool operator<(Vector3f v1, Vector3f v2);
+
+static Vector3f zero_vector = Vector3f(0, 0, 0);
+static Vector3f unit_x_vector = Vector3f(1, 0, 0);
+static Vector3f unit_y_vector = Vector3f(0,1,0);
+static Vector3f unit_z_vector = Vector3f(0,0,1);
+static Vector3f min_vector = Vector3f(FLOAT_MIN, FLOAT_MIN, FLOAT_MIN);
+
+static Vector3f max_vector = Vector3f(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX);
 
 struct Matrix3f {
     Matrix3f() {};
@@ -31,17 +44,30 @@ Vector3f operator-(Vector3f v1, Vector3f v2);
 Vector3f operator*(Vector3f v, float s);
 Vector3f operator*(float s, Vector3f v);
 Vector3f operator+(Vector3f v1, Vector3f v2);
+Vector3f operator/(Vector3f v, float f);
+Vector3f operator/(Vector3f v, int i);
 
 Vector3f operator*(Vector3f v, Matrix3f m);
 Matrix3f operator*(Matrix3f m1, Matrix3f m2);
 
+
+
+struct Line {
+    Line() {};
+    Line(Vector3f point1, Vector3f point2);
+    Vector3f get_point(float param);
+    Vector3f point;
+    Vector3f slope;
+};
+
 struct Triangle {
     Triangle() {};
     Triangle(Vector3f arg_point1, Vector3f arg_point2, Vector3f arg_point3);
-    bool contains_point(Vector3f point);
+    bool contains_point(Vector3f& point);
     std::string to_string();
     Triangle transform(Matrix3f transformation);
     void transform_in_place(Matrix3f transformation);
+    void translate(Vector3f& translation);
     void recompute();
     Vector3f point1;
     Vector3f point2;
@@ -58,7 +84,11 @@ struct Triangle {
     float edge13_edge12_dot;
     float edge12_edge12_dot;
 
-    std::array<Vector3f, 3> points;
+    Line line12;
+    Line line23;
+    Line line31;
+
+    std::array<Vector3f, 3> vertices;
 };
 
 struct TriangleFace {
@@ -79,14 +109,6 @@ struct Plane {
     float point_normal_dot;
 };
 
-struct Line {
-    Line() {};
-    Line(Vector3f point1, Vector3f point2);
-    Vector3f get_point(float param);
-    Vector3f point;
-    Vector3f slope;
-};
-
 struct AABB {
     AABB() {};
     AABB(Vector3f arg_min, Vector3f arg_max);
@@ -103,12 +125,18 @@ struct AABB {
     Plane max_z_plane;
 
     std::array<Plane, 6> planes;
+    std::array<Vector3f, 8> vertices;
 };
+
+float project(Vector3f& point, Line& line);
 
 bool in_between(float a, float b, float c);
 
-float intersects(Line line, Triangle triangle);
-float intersects(Line line, Plane plane);
-bool is_intersects(Line line, AABB aabb);
+bool separates(Triangle& triangle, AABB& aabb, Vector3f axis);
+float intersects(Line& line, Triangle& triangle);
+float intersects(Line& line, Plane& plane);
+bool is_intersects(Line& line, AABB& aabb);
+std::array<float, 2> intersects(Line& line, AABB& aabb);
+bool is_intersects(Triangle& triangle, AABB& aabb);
 
 #endif
