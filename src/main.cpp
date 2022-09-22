@@ -1,5 +1,8 @@
 #include <SDL.h>
+#include <limits>
+#include <png++/png.hpp>
 #include <iostream>
+#include <string>
 #include <vector>
 #include <chrono>
 #include <thread>
@@ -219,8 +222,8 @@ Color operator*(Color c, float brightness) {
 
 
 SDL_Renderer* renderer;
-const int window_width = 800;
-const int window_height = 450;
+const int window_width = 1280;
+const int window_height = 768;
 
 Color screen[window_width][window_height];
 
@@ -370,15 +373,34 @@ int main() {
     float frame_rate = 60.0f;
     unsigned int cpu_count = std::thread::hardware_concurrency();
     while (running) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-        SDL_RenderClear(renderer);
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
                 break;
             }
+            if (event.type == SDL_KEYUP) {
+                if (event.key.repeat == 0 && event.key.keysym.sym == SDLK_s) {
+                    png::image<png::rgb_pixel> screenshot(window_width, window_height);
+                    //TODO read scren
+                    for (int i = 0; i < window_width; i ++) {
+                        for (int j = 0; j < window_height; j ++) {
+                            screenshot[j][i] = png::rgb_pixel(screen[i][j].r, screen[i][j].g, screen[i][j].b);
+                        }
+                    }
+                    for (int i = 1; i <= std::numeric_limits<int>::max(); i ++) {
+                        std::string filename = "screenshots/"+std::to_string(i)+".png";
+                        std::ifstream f(filename);
+                        if (!f.good()) {
+                            screenshot.write(filename);
+                            break;
+                        }
+                    }
+                }
+            }
         }
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_RenderClear(renderer);
         while (!SDL_TICKS_PASSED(SDL_GetTicks(), ticks_count + 1000.0f / frame_rate));
         ticks_count = SDL_GetTicks();
         
