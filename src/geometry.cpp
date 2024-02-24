@@ -54,10 +54,6 @@ float Vector3f::get_length() {
     return sqrt(x * x + y * y + z * z);
 }
 
-bool Vector3f::all_less_than(Vector3f v) {
-    return x < v.x && y < v.y && z < v.z;
-}
-
 bool operator<(Vector3f v1, Vector3f v2) {
     return v1.x < v2.x && v1.y < v2.y && v1.z < v2.z;
 }
@@ -179,16 +175,46 @@ float intersects(Line& line, Plane& plane) {
     }
 }
 
+bool is_product_negative(float a, float b) {
+    return (a > 0 && b < 0) || (a < 0 && b > 0);
+}
 
+/*
 float intersects(Line& line, Triangle& triangle) { //credit: https://stackoverflow.com/a/42752998/12620352 second part
     float det = -line.slope.dot(triangle.normal);
+    if (det < 1e-6) return FLOAT_MAX;
     float inv_det = 1.0f / det;
     Vector3f AO = line.point - triangle.point1;
     Vector3f DAO = AO.cross(line.slope);
     float u = triangle.edge13.dot(DAO) * inv_det;
+    if (u < 0) return FLOAT_MAX;
     float v = -triangle.edge12.dot(DAO) * inv_det;
+    if (v < 0 || (u + v) > 1) return FLOAT_MAX;
     float t = AO.dot(triangle.normal) * inv_det;
-    return (det >= 1e-6 && t >= 0 && u >= 0 && v >= 0 && (u + v) <= 1) ? t : FLOAT_MAX;
+    if (t < 0) return FLOAT_MAX;
+    return t;
+}
+*/
+
+float intersects(Line& line, Triangle& triangle) { //credit: https://stackoverflow.com/a/42752998/12620352 second part
+    float det = -line.slope.dot(triangle.normal);
+    if (det < 1e-6) return FLOAT_MAX;
+
+    Vector3f AO = line.point - triangle.point1;
+    Vector3f DAO = AO.cross(line.slope);
+    float dot13 = triangle.edge13.dot(DAO);
+    if (is_product_negative(dot13, det)) return FLOAT_MAX;
+
+    float dot12 = -triangle.edge12.dot(DAO) ;
+    if (is_product_negative(dot12, det)) return FLOAT_MAX;
+
+    float inv_det = 1.0f / det;
+    float u = dot13 * inv_det;
+    float v = dot12 * inv_det;
+    if ((u + v) > 1) return FLOAT_MAX;
+
+    float t = AO.dot(triangle.normal) * inv_det;
+    return (t < 0) ? FLOAT_MAX : t;
 }
 
 Matrix3f::Matrix3f(std::array<std::array<float, 3>, 3> arg_arr) {

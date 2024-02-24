@@ -17,7 +17,6 @@ struct Vector3f {
     float get_length();
     Vector3f cross(Vector3f v);
     std::string to_string();
-    bool all_less_than(Vector3f v);
 };
 
 bool operator<(Vector3f v1, Vector3f v2);

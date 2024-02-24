@@ -105,7 +105,7 @@ struct Octree {
     }
 
 
-    std::pair<float, int> intersect(std::vector<TriangleObject>& triangles, Line& line) { //run reset_visited() on first call (non-recursive call)
+    std::pair<float, int> intersect(std::vector<TriangleObject>& triangles, Line& line) {
         if (intersects(line, container)[0] != FLOAT_MAX) {
             if (children[0] == nullptr) {
                 float closest_intersection = FLOAT_MAX;
@@ -122,7 +122,7 @@ struct Octree {
                 float closest_intersection = FLOAT_MAX;
                 int closest_intersection_triangle_index = -1;
                 for (auto& child : children) {
-                    if (is_intersects(line, child->container) && child->triangle_indices.size() > 0) {
+                    if (is_intersects(line, child->container)) {
                         std::pair<float, int> current_intersection = child->intersect(triangles, line);
                         if (current_intersection.first < closest_intersection) {
                             closest_intersection = current_intersection.first;
@@ -135,6 +135,23 @@ struct Octree {
         } else {
             return {FLOAT_MAX, -1};
         }
+    }
+
+    std::string to_string() {
+        return to_string("") + "\n";
+    }
+
+    std::string to_string(std::string prefix) {
+        std::string result;
+        result += std::to_string(triangle_indices.size()) + " triangles; depth " + std::to_string(depth) + "\n";
+        if (children[0] != nullptr) {
+            int i = 0;
+            for (auto &child: children) {
+                result += prefix + "├───" + child->to_string(prefix + "|   ");
+                i++;
+            }
+        }
+        return result;
     }
 };
 
@@ -195,6 +212,7 @@ struct Mesh {
         octree = new Octree(bounding_box, 1);
         octree->add_triangles(triangles);
         std::cout << "finished computing octree\n";
+        std::cout << octree->to_string();
     }
 
     std::pair<float, int> intersect(Line line) {
@@ -372,6 +390,7 @@ int main() {
     Uint32 ticks_count = 0;
     float frame_rate = 60.0f;
     unsigned int cpu_count = std::thread::hardware_concurrency();
+    std::cout << "concurrency: " << cpu_count << "\n";
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {

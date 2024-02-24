@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.5.0)
 
 project(CGFromScratch)
 
@@ -17,7 +17,7 @@ if (${FORCE_COLORED_OUTPUT})
        add_compile_options(-fcolor-diagnostics)
     endif()
 endif()
-
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(SDL2 REQUIRED)
 
