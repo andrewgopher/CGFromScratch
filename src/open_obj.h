@@ -2,9 +2,6 @@
 #define CGFROMSCRATCH_OPEN_OBJ_H
 #include "geometry.h"
 #include <vector>
-#include <fstream>
-#include <iostream>
-#include <sstream>
 
 
 class Model3D {

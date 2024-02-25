@@ -1,7 +1,6 @@
 #include "geometry.h"
 #include "float_limits_def.h"
 #include <cmath>
-#include <iterator>
 
 Vector3f::Vector3f(float arg_x, float arg_y, float arg_z) {
     x = arg_x;

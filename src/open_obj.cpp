@@ -1,3 +1,6 @@
+#include <iostream>
+#include <sstream>
+#include <fstream>
 #include "open_obj.h"
 
 void Model3D::open(std::string file_name) { //TODO

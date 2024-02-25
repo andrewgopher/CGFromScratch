@@ -1,8 +1,7 @@
 #ifndef CGFROMSCRATCH_GEOMETRY_H
 #define CGFROMSCRATCH_GEOMETRY_H
-#include <limits>
-#include <iostream>
 #include <array>
+#include <string>
 #include "float_limits_def.h"
 
 //TODO: Vector4f for homogeneous coordinates
